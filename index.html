@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sémantický hádač</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#122844;
+    --bg-2:#0d1f38;
+    --grid-line:rgba(154,196,232,.13);
+    --grid-line-strong:rgba(154,196,232,.24);
+    --ink:#eaf3fb;
+    --ink-soft:#8fadc9;
+    --ink-faint:#5d7997;
+    --amber:#f2a541;
+    --amber-soft:rgba(242,165,65,.18);
+    --ceiling:#e0596b;
+    --rule:rgba(234,243,251,.22);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:36px 18px;
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 28px 28px,
+      radial-gradient(ellipse at 50% 0%, var(--bg) 0%, var(--bg-2) 100%);
+    font-family:'IBM Plex Sans', sans-serif;
+    color:var(--ink);
+  }
+
+  .sheet{
+    position:relative;
+    width:100%;
+    max-width:600px;
+    padding:26px 30px 28px;
+  }
+  /* corner registration marks, like alignment crosses on a technical drawing */
+  .reg{
+    position:absolute;
+    width:16px; height:16px;
+    opacity:.55;
+  }
+  .reg::before, .reg::after{
+    content:"";
+    position:absolute;
+    background:var(--ink-soft);
+  }
+  .reg::before{ width:100%; height:1px; top:50%; }
+  .reg::after{ height:100%; width:1px; left:50%; }
+  .reg.tl{ top:6px; left:6px; }
+  .reg.tr{ top:6px; right:6px; }
+  .reg.bl{ bottom:6px; left:6px; }
+  .reg.br{ bottom:6px; right:6px; }
+
+  .top-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:4px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    margin:0 0 6px;
+  }
+  h1{
+    font-family:'IBM Plex Sans Condensed', sans-serif;
+    font-weight:700;
+    font-size:clamp(24px,4.4vw,30px);
+    letter-spacing:.01em;
+    text-transform:uppercase;
+    margin:0;
+    color:var(--ink);
+  }
+  .status-badge{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    padding:5px 9px;
+    border:1px solid var(--rule);
+    color:var(--ink-soft);
+    white-space:nowrap;
+  }
+  .status-badge.live{ color:#8fd6a8; border-color:rgba(143,214,168,.4); }
+  .status-badge.demo{ color:var(--amber); border-color:rgba(242,165,65,.4); }
+
+  .subtitle{
+    font-size:13.5px;
+    color:var(--ink-soft);
+    line-height:1.55;
+    margin:10px 0 20px;
+    max-width:46em;
+  }
+
+  hr.rule{
+    border:none;
+    border-top:1px solid var(--rule);
+    margin:18px 0;
+  }
+
+  /* ceiling / calibration stat block */
+  .stat-block{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:14px;
+    margin-bottom:4px;
+  }
+  .stat-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+  }
+  .stat-value{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:22px;
+    font-weight:600;
+    color:var(--ceiling);
+  }
+  .stat-note{
+    font-size:12px;
+    color:var(--ink-faint);
+    margin:2px 0 0;
+    line-height:1.5;
+  }
+
+  form{
+    display:flex;
+    gap:10px;
+    margin:20px 0 10px;
+  }
+  input[type=text]{
+    flex:1;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:16px;
+    padding:12px 13px;
+    border:1px solid var(--rule);
+    background:rgba(234,243,251,.04);
+    color:var(--ink);
+    outline:none;
+    border-radius:2px;
+  }
+  input[type=text]::placeholder{ color:var(--ink-faint); }
+  input[type=text]:focus{
+    border-color:var(--amber);
+    background:rgba(242,165,65,.06);
+  }
+  button{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    font-size:13px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    padding:0 20px;
+    border:1px solid var(--amber);
+    border-radius:2px;
+    background:var(--amber-soft);
+    color:var(--amber);
+    cursor:pointer;
+    transition:background .15s ease, transform .08s ease;
+  }
+  button:hover{ background:rgba(242,165,65,.3); }
+  button:active{ transform:scale(.97); }
+  button:disabled{ opacity:.4; cursor:default; }
+  button.ghost{
+    border-color:var(--rule);
+    background:transparent;
+    color:var(--ink-soft);
+    font-size:11px;
+    padding:0 12px;
+  }
+  button.ghost:hover{ background:rgba(234,243,251,.06); }
+
+  .feedback{
+    min-height:18px;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin-bottom:16px;
+  }
+  .feedback.win{ color:#8fd6a8; font-weight:600; }
+  .feedback.err{ color:var(--ceiling); }
+
+  /* best guess so far */
+  .best-block{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    padding:10px 12px;
+    background:rgba(242,165,65,.08);
+    border:1px solid rgba(242,165,65,.25);
+    border-radius:2px;
+    margin-bottom:20px;
+    font-size:13px;
+  }
+  .best-block .lab{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    display:block;
+    margin-bottom:2px;
+  }
+  .best-block .word{ font-weight:600; }
+  .best-block .val{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:17px;
+    color:var(--amber);
+  }
+  .best-block.empty{ color:var(--ink-faint); font-style:italic; }
+
+  /* ruler / measurement scale — signature element */
+  .ruler-wrap{ margin-bottom:22px; }
+  .ruler-label-row{
+    display:flex;
+    justify-content:space-between;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    margin-bottom:2px;
+  }
+  svg.ruler{ width:100%; height:auto; overflow:visible; }
+
+  .history-title{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    margin:0 0 8px;
+  }
+  .history{
+    list-style:none;
+    margin:0; padding:0;
+    max-height:230px;
+    overflow-y:auto;
+  }
+  .history li{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:8px 2px;
+    border-bottom:1px solid var(--grid-line-strong);
+    font-size:13.5px;
+  }
+  .history li:last-child{ border-bottom:none; }
+  .history .word{ flex:1; }
+  .history .lemma-note{
+    font-size:11px;
+    color:var(--ink-faint);
+    font-style:italic;
+  }
+  .history .pct{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    width:64px;
+    text-align:right;
+    color:var(--ink);
+  }
+  .history .raw{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    width:64px;
+    text-align:right;
+    color:var(--ink-faint);
+  }
+  .history li.winner{
+    background:rgba(242,165,65,.1);
+  }
+  .history li.winner .pct{ color:var(--amber); font-weight:700; }
+  .empty-hint{
+    font-size:12.5px;
+    color:var(--ink-faint);
+    font-style:italic;
+    padding:6px 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="sheet">
+  <span class="reg tl"></span><span class="reg tr"></span>
+  <span class="reg bl"></span><span class="reg br"></span>
+
+  <div class="top-row">
+    <div>
+      <p class="eyebrow">Sémantický hádač &middot; ČJ</p>
+      <h1>Najdi skryté slovo</h1>
+    </div>
+    <div class="status-badge demo" id="statusBadge">…</div>
+  </div>
+
+  <p class="subtitle">
+    Hádej podstatná jména. Po každém pokusu uvidíš přesnou sémantickou
+    podobnost tvého slova ke skrytému slovu — čím vyšší číslo, tím blíž jsi.
+  </p>
+
+  <hr class="rule" />
+
+  <div class="stat-block">
+    <span class="stat-label">Nejbližší možná shoda ve slovníku</span>
+    <span class="stat-value" id="ceilingValue">—</span>
+  </div>
+  <p class="stat-note">
+    Toto je podobnost skrytého slova s jeho nejbližším sousedem ve vektorovém
+    prostoru (to slovo samo neznáš) — udává, jak vysoko se dá reálně dostat.
+  </p>
+
+  <form id="guessForm">
+    <input type="text" id="guessInput" placeholder="napiš slovo…" autocomplete="off" maxlength="40" />
+    <button type="submit" id="guessBtn">Změřit</button>
+  </form>
+  <div class="feedback" id="feedback"></div>
+
+  <div class="best-block empty" id="bestBlock">
+    <div><span class="lab">Tvůj nejlepší odhad</span><span class="word">zatím žádný</span></div>
+    <span class="val">—</span>
+  </div>
+
+  <div class="ruler-wrap">
+    <div class="ruler-label-row"><span>0 %</span><span>50 %</span><span>100 %</span></div>
+    <svg class="ruler" viewBox="0 0 560 60" id="rulerSvg">
+      <line x1="10" y1="30" x2="550" y2="30" stroke="var(--rule)" stroke-width="1"/>
+      <g id="ticks"></g>
+      <g id="ceilingMark"></g>
+      <g id="guessMarks"></g>
+    </svg>
+  </div>
+
+  <hr class="rule" />
+
+  <div class="history-title">
+    <span>Všechny pokusy (nejlepší nahoře)</span>
+    <button class="ghost" id="newGameBtn" type="button">Nová hra</button>
+  </div>
+  <ul class="history" id="historyList"></ul>
+  <div class="empty-hint" id="emptyHint">Zatím žádné pokusy.</div>
+</div>
+
+<script>
+/* ------------------------------------------------------------------
+ * Config: point this at your deployed FastAPI backend.
+ * ------------------------------------------------------------------ */
+const API_BASE = "http://localhost:8000"; // e.g. "https://your-app.onrender.com"
+const REQUEST_TIMEOUT_MS = 2500;
+
+/* In-memory only — per artifact rules, never localStorage/sessionStorage.
+ * A page refresh starts a fresh game, same as losing the session token
+ * would on the real backend. */
+let sessionToken = null;
+let demoMode = false;
+let ceilingPercentage = null;
+let guessHistory = []; // {guess, lemma, found, similarity, percentage, solved}
+
+const statusBadge = document.getElementById('statusBadge');
+const guessForm = document.getElementById('guessForm');
+const guessInput = document.getElementById('guessInput');
+const guessBtn = document.getElementById('guessBtn');
+const feedback = document.getElementById('feedback');
+const historyList = document.getElementById('historyList');
+const emptyHint = document.getElementById('emptyHint');
+const ceilingValueEl = document.getElementById('ceilingValue');
+const bestBlock = document.getElementById('bestBlock');
+const newGameBtn = document.getElementById('newGameBtn');
+const ticksG = document.getElementById('ticks');
+const ceilingMarkG = document.getElementById('ceilingMark');
+const guessMarksG = document.getElementById('guessMarks');
+
+const RULER_X0 = 10, RULER_X1 = 550; // matches viewBox coords
+
+function xForPct(pct){
+  const clamped = Math.max(0, Math.min(100, pct));
+  return RULER_X0 + (clamped/100) * (RULER_X1 - RULER_X0);
+}
+
+function withTimeout(promise, ms){
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+  ]);
+}
+
+async function apiPost(path, body){
+  const res = await withTimeout(fetch(API_BASE + path, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body || {})
+  }), REQUEST_TIMEOUT_MS);
+  if(!res.ok){
+    const detail = await res.json().catch(() => ({}));
+    const err = new Error(detail.detail || `HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
+
+/* --------------------------------------------------------------
+ * Demo-mode fallback.
+ * If the real backend at API_BASE can't be reached (e.g. you're
+ * previewing this file with no server running yet), the UI falls
+ * back to a small local simulation so you can see the interaction
+ * working end-to-end. It's clearly labeled in the status badge —
+ * this is only a stand-in for local preview, not a substitute for
+ * the real API.
+ * -------------------------------------------------------------- */
+const DEMO_SECRET = "hrad";
+const DEMO_CEILING = 78.4; // pretend "zámek" scores this against "hrad"
+const DEMO_SIMILARITY = {
+  "hrad":100.0, "zámek":71.9, "věž":58.2, "město":41.0, "kámen":33.6,
+  "auto":6.1, "kniha":9.4, "slunce":4.8, "počítač":2.1, "moře":7.7
+};
+function demoLemmatize(word){ return word; } // no real lemmatizer in demo mode
+function demoSimilarity(word){ return DEMO_SIMILARITY[word] ?? null; }
+
+async function startGame(){
+  feedback.textContent = '';
+  feedback.className = 'feedback';
+  guessHistory = [];
+  renderHistory();
+  renderBest();
+  clearRuler();
+
+  try{
+    const data = await apiPost('/new-game');
+    sessionToken = data.session_token;
+    ceilingPercentage = data.ceiling_percentage;
+    demoMode = false;
+    setStatus(true);
+  }catch(e){
+    sessionToken = 'demo-' + Math.random().toString(36).slice(2);
+    ceilingPercentage = DEMO_CEILING;
+    demoMode = true;
+    setStatus(false);
+  }
+  ceilingValueEl.textContent = ceilingPercentage != null ? `${ceilingPercentage.toFixed(2)} %` : '—';
+  drawCeilingMark();
+  drawTicks();
+  guessInput.focus();
+}
+
+function setStatus(live){
+  statusBadge.textContent = live ? 'spojeno' : 'režim ukázky';
+  statusBadge.className = 'status-badge ' + (live ? 'live' : 'demo');
+}
+
+async function submitGuess(rawWord){
+  const word = rawWord.trim().toLowerCase();
+  if(!word) return;
+
+  guessBtn.disabled = true;
+  feedback.textContent = '';
+  feedback.className = 'feedback';
+
+  try{
+    let result;
+    if(demoMode){
+      await new Promise(r => setTimeout(r, 150));
+      const lemma = demoLemmatize(word);
+      const pct = demoSimilarity(lemma);
+      result = {
+        guess: word, lemma, found: pct !== null,
+        similarity: pct !== null ? pct/100 : null,
+        percentage: pct,
+        solved: lemma === DEMO_SECRET
+      };
+    } else {
+      result = await apiPost('/guess', { session_token: sessionToken, guess: word });
+    }
+    handleGuessResult(result);
+  }catch(e){
+    if(e.status === 429){
+      feedback.textContent = 'Moc rychle — chvíli počkej a zkus to znovu.';
+    } else if(e.status === 404 || e.status === 410){
+      feedback.textContent = 'Hra vypršela — začni novou hru.';
+    } else if(e.status === 422){
+      feedback.textContent = 'Slovo smí obsahovat jen písmena.';
+    } else {
+      feedback.textContent = 'Něco se pokazilo. Zkus to znovu.';
+    }
+    feedback.className = 'feedback err';
+  }finally{
+    guessBtn.disabled = false;
+    guessInput.value = '';
+    guessInput.focus();
+  }
+}
+
+function handleGuessResult(result){
+  if(!result.found){
+    feedback.textContent = 'Slovo nenalezeno ve slovníku.';
+    feedback.className = 'feedback err';
+    return;
+  }
+
+  guessHistory.unshift(result);
+  guessHistory.sort((a,b) => (b.percentage ?? -Infinity) - (a.percentage ?? -Infinity));
+  renderHistory();
+  renderBest();
+  drawGuessMarks();
+
+  if(result.solved){
+    feedback.textContent = `Přesně tak! Skryté slovo bylo „${result.lemma}“.`;
+    feedback.className = 'feedback win';
+  }
+}
+
+function renderBest(){
+  if(guessHistory.length === 0){
+    bestBlock.className = 'best-block empty';
+    bestBlock.innerHTML = `<div><span class="lab">Tvůj nejlepší odhad</span><span class="word">zatím žádný</span></div><span class="val">—</span>`;
+    return;
+  }
+  const best = guessHistory[0];
+  bestBlock.className = 'best-block';
+  bestBlock.innerHTML = `
+    <div><span class="lab">Tvůj nejlepší odhad</span><span class="word">${escapeHtml(best.guess)}</span></div>
+    <span class="val">${best.percentage.toFixed(2)} %</span>
+  `;
+}
+
+function renderHistory(){
+  historyList.innerHTML = '';
+  emptyHint.style.display = guessHistory.length ? 'none' : 'block';
+  for(const g of guessHistory){
+    const li = document.createElement('li');
+    if(g.solved) li.classList.add('winner');
+
+    const word = document.createElement('span');
+    word.className = 'word';
+    word.textContent = g.guess;
+    if(g.lemma && g.lemma !== g.guess){
+      const note = document.createElement('span');
+      note.className = 'lemma-note';
+      note.textContent = ` (${g.lemma})`;
+      word.appendChild(note);
+    }
+
+    const pct = document.createElement('span');
+    pct.className = 'pct';
+    pct.textContent = `${g.percentage.toFixed(2)} %`;
+
+    const raw = document.createElement('span');
+    raw.className = 'raw';
+    raw.textContent = g.similarity.toFixed(4);
+
+    li.append(word, pct, raw);
+    historyList.appendChild(li);
+  }
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+/* ---------------- ruler drawing ---------------- */
+
+function clearRuler(){
+  ticksG.innerHTML = '';
+  ceilingMarkG.innerHTML = '';
+  guessMarksG.innerHTML = '';
+}
+
+function drawTicks(){
+  ticksG.innerHTML = '';
+  for(let p = 0; p <= 100; p += 10){
+    const x = xForPct(p);
+    const tick = document.createElementNS('http://www.w3.org/2000/svg','line');
+    tick.setAttribute('x1', x); tick.setAttribute('x2', x);
+    tick.setAttribute('y1', 26); tick.setAttribute('y2', 34);
+    tick.setAttribute('stroke', 'var(--rule)');
+    tick.setAttribute('stroke-width', p % 50 === 0 ? 1.5 : 1);
+    ticksG.appendChild(tick);
+  }
+}
+
+function drawCeilingMark(){
+  ceilingMarkG.innerHTML = '';
+  if(ceilingPercentage == null) return;
+  const x = xForPct(ceilingPercentage);
+  const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+  line.setAttribute('x1', x); line.setAttribute('x2', x);
+  line.setAttribute('y1', 8); line.setAttribute('y2', 52);
+  line.setAttribute('stroke', 'var(--ceiling)');
+  line.setAttribute('stroke-width', 1.5);
+  line.setAttribute('stroke-dasharray', '3,3');
+  ceilingMarkG.appendChild(line);
+
+  const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+  label.setAttribute('x', x);
+  label.setAttribute('y', 6);
+  label.setAttribute('text-anchor', 'middle');
+  label.setAttribute('font-family', 'IBM Plex Mono, monospace');
+  label.setAttribute('font-size', '9');
+  label.setAttribute('fill', 'var(--ceiling)');
+  label.textContent = 'strop';
+  ceilingMarkG.appendChild(label);
+}
+
+function drawGuessMarks(){
+  guessMarksG.innerHTML = '';
+  guessHistory.forEach((g, i) => {
+    const x = xForPct(g.percentage);
+    const isBest = i === 0;
+    const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx', x);
+    circle.setAttribute('cy', 30);
+    circle.setAttribute('r', isBest ? 5 : 3.5);
+    circle.setAttribute('fill', isBest ? 'var(--amber)' : 'rgba(242,165,65,.45)');
+    circle.setAttribute('stroke', 'var(--bg)');
+    circle.setAttribute('stroke-width', '1');
+    guessMarksG.appendChild(circle);
+  });
+}
+
+guessForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  submitGuess(guessInput.value);
+});
+newGameBtn.addEventListener('click', startGame);
+
+startGame();
+</script>
+</body>
+</html>

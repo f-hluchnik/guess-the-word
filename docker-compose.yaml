@@ -1,0 +1,15 @@
+services:
+  semantic-game:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # This points to the path inside the container where we mount the file
+      - VECTORS_PATH=/data/cc.cs.300.kv
+      - ALLOWED_ORIGINS=http://localhost:3000
+    volumes:
+      # Mount the local vector file into the /data directory of the container
+      # The :ro suffix ensures the container can only READ the file
+      - ./cc.cs.300.kv:/data/cc.cs.300.kv:ro
+      - ./cc.cs.300.kv.vectors.npy:/data/cc.cs.300.kv.vectors.npy:ro
+    restart: always
