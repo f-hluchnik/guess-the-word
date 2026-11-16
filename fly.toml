@@ -1,0 +1,39 @@
+# Fly.io configuration. See README.md, "Deploying to Fly.io".
+# App names are global on Fly: change this if "kosinus" is taken.
+app = "kosinus"
+primary_region = "ams"
+kill_signal = "SIGTERM"
+kill_timeout = "10s"
+
+[build]
+  [build.args]
+    FREQUENT_WORDS = "300000"
+
+[env]
+  # Fly's proxy sets this header and overwrites any value a client sends.
+  CLIENT_IP_HEADER = "Fly-Client-IP"
+  LOG_LEVEL = "INFO"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  # Keep one machine always warm; a second one starts only under load.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 150
+    hard_limit = 250
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "15s"
+    timeout = "3s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

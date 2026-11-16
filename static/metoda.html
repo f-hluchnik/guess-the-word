@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jak se podobnost počítá · Kosinus</title>
+  <meta name="theme-color" content="#f7f8fa">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="sheet prose">
+    <p><a href="./">Zpět ke hře</a></p>
+    <h1>Jak se podobnost počítá</h1>
+
+    <h2>Vektory</h2>
+    <p>
+      Každé slovo ve slovníku je vektor o 300 rozměrech z modelu fastText,
+      natrénovaného na českých textech z Common Crawl a Wikipedie. Slova, která
+      se v textech objevují ve stejných souvislostech, mají vektory blízko sebe.
+    </p>
+
+    <h2>Podobnost</h2>
+    <p>Podobnost tipu <var>a</var> a hledaného slova <var>b</var> je kosinus úhlu mezi jejich vektory:</p>
+    <p class="formula">
+      cos&nbsp;θ = <var>a</var>&thinsp;·&thinsp;<var>b</var> / (‖<var>a</var>‖&thinsp;‖<var>b</var>‖)
+    </p>
+    <p>
+      Hra ho ukazuje vynásobený stem, tedy v procentech, bez dalších přepočtů.
+      Hodnota může vyjít i záporně. Výpočet je deterministický: stejné slovo
+      dostane vždy stejné číslo, kdykoli a komukoli.
+    </p>
+
+    <h2>Srovnávací hodnoty</h2>
+    <p>
+      Pod zadáním hra ukazuje podobnost nejbližšího, desátého a tisícího
+      nejbližšího slova ve slovníku. Slova samotná neprozradí. Tvary hledaného
+      slova, třeba „jizvy“ u slova „jizva“, se do pořadí nepočítají, protože by
+      byly vždy nejblíž.
+    </p>
+
+    <h2>Slovník</h2>
+    <p>
+      Slovník tvoří 300 000 nejčastějších slov psaných malými písmeny české
+      abecedy a k nim méně častá slova, která zná český slovník knihovny
+      simplemma. Dohromady zhruba 350 000 slov. Vzácnější tvary z dat fastText
+      vynecháváme, protože jde většinou o překlepy, slepená slova a slovenské
+      tvary.
+    </p>
+
+    <h2>Tvary slov</h2>
+    <p>
+      Slovo se měří tak, jak ho napíšeš. Když ve slovníku není, změří se jeho
+      základní tvar. Jiný tvar hledaného slova se počítá jako uhodnutý.
+    </p>
+
+    <h2>Výběr slov</h2>
+    <p>
+      Hledaná slova vybíráme ručně z běžných podstatných jmen. Jejich pořadí je
+      dané předem, ale tajné.
+    </p>
+
+    <h2>Soukromí</h2>
+    <p>
+      Hra nepoužívá cookies, účty ani analytiku. Tvoje pokusy se ukládají jen
+      v tvém prohlížeči a server je nikam nezapisuje. IP adresu drží server jen
+      krátce v paměti, aby mohl omezit počet pokusů za minutu.
+    </p>
+
+    <h2>Zdroje a licence</h2>
+    <ul>
+      <li>
+        Slovní vektory:
+        <a href="https://fasttext.cc/docs/en/crawl-vectors.html">fastText</a>
+        (Facebook AI Research), licence
+        <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>.
+        E. Grave, P. Bojanowski, P. Gupta, A. Joulin, T. Mikolov:
+        <cite>Learning Word Vectors for 157 Languages</cite>, LREC 2018.
+        Pro hru jsme z dat vybrali slovník popsaný výše.
+      </li>
+      <li>
+        Základní tvary slov a slovník:
+        <a href="https://github.com/adbar/simplemma">simplemma</a>
+        (Adrien Barbaresi), licence MIT.
+      </li>
+      <li>
+        Zdrojový kód hry:
+        <a href="https://github.com/f-hluchnik/guess-the-word">GitHub</a>.
+      </li>
+    </ul>
+  </main>
+</body>
+</html>

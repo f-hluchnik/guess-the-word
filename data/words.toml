@@ -1,0 +1,29 @@
+# The secret words. See "Maintaining the word list" in README.md.
+#
+# Rules, enforced by `python -m scripts.words check`:
+# - Only ever append new [[batch]] tables at the end.
+# - Never edit a batch that has started; that would change past puzzles.
+#   Unstarted batches may be edited freely.
+# - Common, concrete nouns in the singular nominative. Every word must exist
+#   in the vectors (checked when the Docker image is built).
+#
+# Within a batch, the order of play is a secret shuffle keyed by
+# PUZZLE_SECRET, so the order you write words in doesn't matter.
+
+# Puzzle no. 1 is played on this day. Set it to your launch date.
+epoch = 2026-11-16
+# A new puzzle starts at midnight in this time zone.
+timezone = "Europe/Prague"
+
+[[batch]]
+words = [
+  "jizva",
+  "hrad",
+  "auto",
+  "kniha",
+  "slunce",
+  "počítač",
+  "moře",
+  "chléb",
+  "kytara",
+]

@@ -1,0 +1,21 @@
+name: Word list runway
+
+# Fails, and so emails the repository owner, when fewer than 30 days of
+# puzzles are left. Needs no secrets: it never sees the order of the words.
+on:
+  schedule:
+    - cron: "17 7 * * 1" # Mondays
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m scripts.words status --min-runway 30
