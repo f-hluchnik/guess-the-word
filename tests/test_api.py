@@ -276,3 +276,30 @@ def test_diacritic_free_spelling_solves() -> None:
     assert game.guess(puzzle, "kocka").solved
     assert game.guess(puzzle, "kocky").solved  # alias to an inflected form of the secret
     assert not game.guess(puzzle, "pes").solved
+
+
+def test_precomputed_references_are_used(vectors_path, tmp_path) -> None:
+    import argparse
+    import json
+    import shutil
+
+    from app.vectorfiles import references_file
+    from app.vocabulary import SemanticModel
+    from scripts.words import references
+    from tests.conftest import write_words
+
+    copy = tmp_path / vectors_path.name
+    for f in vectors_path.parent.glob(vectors_path.name + "*"):
+        shutil.copy(f, tmp_path / f.name)
+    words = write_words(tmp_path / "words.toml", ["jizva", "hrad"])
+
+    assert references(argparse.Namespace(path=words, vectors=copy)) == 0
+    saved = json.loads(references_file(copy).read_text())
+    assert set(saved) == {"jizva", "hrad"}
+
+    fresh = SemanticModel.load(vectors_path).reference("jizva")
+    assert SemanticModel.load(copy).reference("jizva") == fresh
+
+    # The server really reads the file rather than recomputing.
+    references_file(copy).write_text(json.dumps({"jizva": {"1": 0.5}}))
+    assert SemanticModel.load(copy).reference("jizva") == {1: 0.5}

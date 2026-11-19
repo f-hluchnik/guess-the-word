@@ -30,8 +30,11 @@ COPY scripts ./scripts
 COPY static ./static
 COPY data ./data
 
-# Fail the build, not the deploy, if a secret word has no vector.
-RUN python -m scripts.words check --vectors vectors/cc.cs.300.kv --quiet
+# Fail the build, not the deploy, if a secret word has no vector. Then
+# precompute each secret word's reference values, so a cold start doesn't
+# read the whole matrix (several seconds on a small machine).
+RUN python -m scripts.words check --vectors vectors/cc.cs.300.kv --quiet \
+ && python -m scripts.words references --vectors vectors/cc.cs.300.kv
 
 RUN useradd --system --uid 10001 --no-create-home app
 USER app

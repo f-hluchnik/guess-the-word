@@ -3,7 +3,8 @@
 python -m scripts.words check                      # format and duplicates
 python -m scripts.words check --vectors PATH       # + vocabulary and quality report
 python -m scripts.words check --against OLD.toml   # started batches unchanged
-python -m scripts.words status [--min-runway 30]   # how many days are left
+python -m scripts.words status [--min-runway 14]   # how many days are left
+python -m scripts.words references --vectors PATH  # precompute reference values
 PUZZLE_SECRET=... python -m scripts.words peek     # upcoming answers (spoilers!)
 """
 
@@ -89,6 +90,21 @@ def quality_report(words: WordList, vectors: Path, quiet: bool) -> list[str]:
     return errors
 
 
+def references(args: argparse.Namespace) -> int:
+    """Precompute every secret word's reference values next to the vectors."""
+    import json
+
+    from app.vectorfiles import references_file
+    from app.vocabulary import SemanticModel
+
+    words = WordList.load(args.path)
+    model = SemanticModel.load(args.vectors)
+    values = {word: model.compute_reference(word) for word in words.words}
+    references_file(args.vectors).write_text(json.dumps(values, ensure_ascii=False))
+    print(f"Saved reference values for {len(values)} words next to {args.vectors}.")
+    return 0
+
+
 def status(args: argparse.Namespace) -> int:
     words = WordList.load(args.path)
     today = words.number_on(words.today())
@@ -132,6 +148,10 @@ def main() -> None:
     p.add_argument("--against", type=Path, help="previous version, to protect started batches")
     p.add_argument("--quiet", action="store_true", help="only list words with notes")
     p.set_defaults(run=check)
+
+    p = commands.add_parser("references", help="precompute reference values for the image")
+    p.add_argument("--vectors", type=Path, required=True)
+    p.set_defaults(run=references)
 
     p = commands.add_parser("status", help="show how long the list lasts")
     p.add_argument("--min-runway", type=int, help="exit 1 if fewer days are left")
