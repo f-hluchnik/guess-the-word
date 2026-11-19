@@ -11,7 +11,7 @@
 # PUZZLE_SECRET, so the order you write words in doesn't matter.
 
 # Puzzle no. 1 is played on this day. Set it to your launch date.
-epoch = 2026-11-16
+epoch = 2026-11-19
 # A new puzzle starts at midnight in this time zone.
 timezone = "Europe/Prague"
 
