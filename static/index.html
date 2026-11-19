@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="application-name" content="Kosinus">
+  <title>Kosinus</title>
+  <meta name="description" content="Denní slovní hra: najdi skryté podstatné jméno podle kosinové podobnosti slovních vektorů.">
+  <meta name="theme-color" content="#f7f8fa">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main class="sheet">
+    <header>
+      <h1 id="title">Kosinus</h1>
+      <p class="date" id="date"></p>
+    </header>
+
+    <p class="intro">
+      Hledej skryté podstatné jméno. Každé z <span id="vocabulary">350 000</span> slov
+      ve slovníku je vektor o 300 rozměrech a u každého tipu uvidíš kosinovou
+      podobnost jeho vektoru s vektorem hledaného slova.
+    </p>
+    <p class="scale" id="scale" hidden></p>
+
+    <form class="guess-form" id="guess-form" autocomplete="off" novalidate>
+      <label class="visually-hidden" for="guess">Tvůj tip</label>
+      <input id="guess" name="guess" type="text" maxlength="40" placeholder="napiš slovo"
+             autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" disabled>
+      <button type="submit" disabled>Změřit</button>
+    </form>
+    <p class="status" id="status" role="status" aria-live="polite">Načítám dnešní slovo…</p>
+
+    <section aria-labelledby="guesses-heading">
+      <h2 class="visually-hidden" id="guesses-heading">Pokusy seřazené podle podobnosti</h2>
+      <table class="guesses" id="guesses" hidden>
+        <colgroup><col class="col-n"><col><col class="col-pct"></colgroup>
+        <thead class="visually-hidden">
+          <tr><th scope="col">Pokus</th><th scope="col">Slovo</th><th scope="col">Podobnost</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <footer>
+      <p>Nové slovo každý den o půlnoci.</p>
+      <p><a href="metoda.html">Jak se podobnost počítá</a></p>
+    </footer>
+  </main>
+</body>
+</html>

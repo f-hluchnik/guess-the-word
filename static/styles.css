@@ -1,0 +1,295 @@
+/* A page from a Czech school exercise book: ruled lines, a red margin,
+   and the player's own words written in school-ink blue. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #f7f8fa;
+  --graphite: #23272e;
+  --pencil: #646c78;
+  --rule: #d3ddea;
+  --margin: #e07b7b;
+  --ink: #1f3c96;
+  --ink-wash: #e3e9f6;
+
+  --serif:
+    "Iowan Old Style", "Palatino Linotype", Palatino, "URW Palladio L", P052, "Book Antiqua",
+    Georgia, serif;
+  --gutter: 3.5rem;
+  --line: 2.75rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--graphite);
+  font: 1.0625rem/1.6 var(--serif);
+  font-variant-numeric: tabular-nums lining-nums;
+  -webkit-text-size-adjust: 100%;
+}
+
+.sheet {
+  position: relative;
+  max-width: 40rem;
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding: 3.5rem 1.5rem 2.5rem var(--gutter);
+}
+
+/* The margin line. */
+.sheet::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: calc(var(--gutter) - 1rem);
+  border-left: 1px solid var(--margin);
+}
+
+h1 {
+  margin: 0;
+  font-size: 2.125rem;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.date {
+  margin: 0.25rem 0 0;
+  color: var(--pencil);
+}
+
+.intro {
+  max-width: 34em;
+  margin: 1.75rem 0 0;
+}
+
+.scale {
+  max-width: 34em;
+  margin: 0.75rem 0 0;
+  color: var(--pencil);
+}
+
+/* Writing on a line rather than typing into a box. */
+.guess-form {
+  display: flex;
+  gap: 0.75rem;
+  align-items: end;
+  margin-top: 2.25rem;
+}
+
+.guess-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0 0.35rem;
+  border: 0;
+  border-bottom: 2px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1.5rem;
+  caret-color: var(--ink);
+}
+
+.guess-form input::placeholder {
+  color: var(--pencil);
+  opacity: 0.7;
+}
+
+.guess-form input:focus {
+  outline: none;
+  border-bottom-color: var(--ink);
+}
+
+.guess-form button {
+  padding: 0.6rem 1.25rem;
+  border: 0;
+  border-radius: 3px;
+  background: var(--ink);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.guess-form button:hover {
+  background: #183077;
+}
+
+.guess-form :disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.guess-form input:focus-visible {
+  outline: none;
+}
+
+.status {
+  min-height: calc(1.6em * 2);
+  margin: 0.75rem 0 1.5rem;
+  color: var(--pencil);
+}
+
+.status .word {
+  color: var(--ink);
+}
+
+.status.is-solved {
+  color: var(--graphite);
+}
+
+/* Guesses on ruled lines; attempt numbers sit in the margin. */
+.guesses {
+  width: calc(100% + var(--gutter));
+  margin-left: calc(-1 * var(--gutter));
+  table-layout: fixed;
+  border-collapse: collapse;
+  border-top: 1px solid var(--rule);
+}
+
+.guesses td {
+  height: var(--line);
+  padding: 0 0 0 1rem;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+
+.guesses .col-n {
+  width: calc(var(--gutter) - 1rem);
+}
+
+.guesses .col-pct {
+  width: 6.5rem;
+}
+
+.guesses .n {
+  padding: 0 0.6rem 0 0;
+  color: var(--pencil);
+  font-size: 0.875rem;
+  text-align: right;
+}
+
+.guesses .word {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.guesses .lemma {
+  margin-left: 0.4em;
+  color: var(--pencil);
+  font-size: 0.875rem;
+}
+
+.guesses .pct {
+  text-align: right;
+}
+
+.guesses tr.is-latest .word {
+  color: var(--ink);
+}
+
+.guesses tr.is-solved td {
+  font-weight: 600;
+}
+
+.guesses tr.is-new td {
+  animation: written 1.6s ease-out;
+}
+
+@keyframes written {
+  from {
+    background: var(--ink-wash);
+  }
+}
+
+footer {
+  margin-top: 3rem;
+  color: var(--pencil);
+  font-size: 0.875rem;
+}
+
+footer p {
+  margin: 0.25rem 0;
+}
+
+a {
+  color: var(--ink);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 30rem) {
+  :root {
+    --gutter: 2.75rem;
+  }
+
+  .sheet {
+    padding: 2.25rem 1rem 2rem var(--gutter);
+  }
+
+  h1 {
+    font-size: 1.75rem;
+  }
+
+  .guesses td {
+    padding-left: 0.75rem;
+  }
+
+  .guesses .col-pct {
+    width: 5.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guesses tr.is-new td {
+    animation: none;
+  }
+}
+
+/* Longer text pages: method and sources, 404. */
+.prose h1 {
+  margin-top: 1.5rem;
+}
+
+.prose h2 {
+  margin: 2.25rem 0 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.prose p,
+.prose ul {
+  max-width: 34em;
+}
+
+.prose li + li {
+  margin-top: 0.5rem;
+}
+
+.formula {
+  margin: 1rem 0;
+  font-size: 1.25rem;
+  font-style: normal;
+}
