@@ -36,7 +36,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             WordList.load(settings.words_path),
             key=settings.puzzle_secret.get_secret_value().encode(),
         )
-        app.state.game = Game(model, calendar)
+        game = Game(model, calendar)
+        # Warm up while the machine boots, not on the first player's request.
+        game.reference(game.today())
+        app.state.game = game
         yield
 
     app = FastAPI(

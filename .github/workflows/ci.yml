@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+    # "labeled" re-runs the checks when schedule-reset is added.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -25,6 +27,9 @@ jobs:
       - run: ruff format --check .
       - run: pytest
       - name: Word list keeps started batches unchanged
+        # Add the "schedule-reset" label to a pull request to skip this on
+        # purpose, e.g. to replace the list before launch.
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'schedule-reset') }}
         run: |
           git show origin/main:data/words.toml > /tmp/words-main.toml 2>/dev/null || true
           if [ -s /tmp/words-main.toml ]; then
