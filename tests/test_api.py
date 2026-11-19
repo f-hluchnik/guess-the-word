@@ -186,3 +186,33 @@ def test_chunked_norms_match_gensim(vectors_path) -> None:
     finally:
         vocabulary._NORM_CHUNK = original
     np.testing.assert_allclose(model._vectors.norms, expected.norms, rtol=1e-6)
+
+
+def test_diacritic_free_spelling_is_measured_as_the_dictionary_word(client: TestClient) -> None:
+    plain = guess(client, "sram").json()
+    proper = guess(client, "šrám").json()
+    assert plain["lemma"] == "šrám"
+    assert plain["similarity"] == proper["similarity"]
+
+
+def test_diacritic_free_spelling_solves() -> None:
+    from datetime import date
+    from zoneinfo import ZoneInfo
+
+    import numpy as np
+    from gensim.models import KeyedVectors
+
+    from app.game import Game
+    from app.puzzle import PuzzleCalendar, WordList
+    from app.vocabulary import SemanticModel
+
+    vectors = KeyedVectors(3, dtype=np.float32)
+    vectors.add_vectors(["kočka", "kočky", "pes"], np.eye(3, dtype=np.float32))
+    model = SemanticModel(vectors, aliases={"kocka": "kočka", "kocky": "kočky"})
+    words = WordList(date(2026, 1, 1), ZoneInfo("Europe/Prague"), (("kočka",),))
+    game = Game(model, PuzzleCalendar(words, key=b"k" * 16))
+    puzzle = game.puzzle(1)
+
+    assert game.guess(puzzle, "kocka").solved
+    assert game.guess(puzzle, "kocky").solved  # alias to an inflected form of the secret
+    assert not game.guess(puzzle, "pes").solved

@@ -1,6 +1,7 @@
 """Input normalisation shared by the API and the vector build script."""
 
 import unicodedata
+from pathlib import Path
 
 MAX_WORD_LENGTH = 40
 
@@ -19,3 +20,14 @@ def normalize(raw: str) -> str:
 def is_word(text: str) -> bool:
     """True for a single, already-normalised Czech word made of letters only."""
     return 0 < len(text) <= MAX_WORD_LENGTH and CZECH_LETTERS.issuperset(text)
+
+
+def strip_diacritics(word: str) -> str:
+    """ "židle" -> "zidle"."""
+    decomposed = unicodedata.normalize("NFD", word)
+    return "".join(c for c in decomposed if not unicodedata.combining(c))
+
+
+def aliases_file(vectors_path: Path) -> Path:
+    """Where the build script stores spelling aliases next to the vectors."""
+    return vectors_path.with_name(vectors_path.name + ".aliases.json")

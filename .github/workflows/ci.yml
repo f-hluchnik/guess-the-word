@@ -6,6 +6,8 @@ on:
   pull_request:
     # "labeled" re-runs the checks when schedule-reset is added.
     types: [opened, synchronize, reopened, labeled, unlabeled]
+  # Run by hand from the Actions tab, e.g. to test a renewed FLY_API_TOKEN.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -40,7 +42,7 @@ jobs:
 
   deploy:
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     concurrency: deploy-production
     environment: production

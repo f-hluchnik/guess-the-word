@@ -1,6 +1,8 @@
 """Word vectors and lemmatisation behind a small, game-shaped interface."""
 
+import json
 import logging
+from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
 
@@ -8,7 +10,7 @@ import numpy as np
 import simplemma
 from gensim.models import KeyedVectors
 
-from app.text import is_word
+from app.text import aliases_file, is_word
 
 log = logging.getLogger(__name__)
 
@@ -30,8 +32,10 @@ _NOUN_ENDINGS = frozenset(
 
 
 class SemanticModel:
-    def __init__(self, vectors: KeyedVectors) -> None:
+    def __init__(self, vectors: KeyedVectors, aliases: Mapping[str, str] | None = None) -> None:
         self._vectors = vectors
+        # Spellings without diacritics ("zidle") -> the dictionary word ("židle").
+        self._aliases = dict(aliases or {})
         # Precompute norms now so the first request doesn't pay for it.
         matrix = vectors.vectors
         vectors.norms = np.concatenate(
@@ -45,9 +49,13 @@ class SemanticModel:
     @classmethod
     def load(cls, path: Path) -> "SemanticModel":
         log.info("Loading word vectors from %s", path)
+        aliases_path = aliases_file(path)
+        aliases = (
+            json.loads(aliases_path.read_text(encoding="utf-8")) if aliases_path.exists() else {}
+        )
         # mmap keeps the matrix in the page cache, shared between workers.
-        model = cls(KeyedVectors.load(str(path), mmap="r"))
-        log.info("Loaded %d word vectors", len(model))
+        model = cls(KeyedVectors.load(str(path), mmap="r"), aliases)
+        log.info("Loaded %d word vectors and %d spelling aliases", len(model), len(aliases))
         return model
 
     def __len__(self) -> int:
@@ -67,12 +75,20 @@ class SemanticModel:
     def resolve(self, word: str) -> str | None:
         """The vocabulary entry to measure a guess by, or None if unknown.
 
-        The exact form wins over the lemma: fastText has vectors for inflected
-        forms, and simplemma occasionally maps a base form to a different word
-        (e.g. "rána" -> "ráno"). The lemma is only a fallback for rare forms.
+        In order of preference:
+        1. The word itself. fastText has vectors for inflected forms, and
+           simplemma occasionally maps a base form to a different word
+           (e.g. "rána" -> "ráno"), so the exact form wins.
+        2. The dictionary word it is a diacritic-free spelling of ("zidle" ->
+           "židle"). Those spellings have vectors of their own, learnt from
+           text typed without diacritics, and would score unrelated to the
+           word the player means.
+        3. Its lemma, for rare forms.
         """
         if word in self._vectors:
             return word
+        if word in self._aliases:
+            return self._aliases[word]
         lemma = self.lemma(word)
         return lemma if lemma in self._vectors else None
 

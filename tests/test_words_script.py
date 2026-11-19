@@ -43,3 +43,16 @@ def test_epoch_is_frozen_after_launch_only() -> None:
     assert frozen_violations(words(ONE), moved, at(2))
     before_launch = datetime(2025, 12, 1, tzinfo=UTC)
     assert frozen_violations(words(ONE), moved, before_launch) == []
+
+
+def test_status_before_launch(tmp_path, capsys, monkeypatch) -> None:
+    import argparse
+
+    from scripts.words import status
+    from tests.conftest import write_words
+
+    path = write_words(tmp_path / "words.toml", ["hrad", "auto"], epoch=date(2999, 1, 1))
+    assert status(argparse.Namespace(path=path, min_runway=None)) == 0
+    out = capsys.readouterr().out
+    assert "Not launched yet: puzzle 1 is on 2999-01-01" in out
+    assert "Today is puzzle 1." in out

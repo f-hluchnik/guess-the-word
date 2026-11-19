@@ -51,10 +51,13 @@ class Game:
     def guess(self, puzzle: Puzzle, word: str) -> GuessResult:
         """Score an already normalised and validated word."""
         secret = puzzle.secret
-        if word == secret or self._model.lemma(word) == secret:
+        term = self._model.resolve(word)
+        forms = {word, self._model.lemma(word)}
+        if term is not None:
+            forms |= {term, self._model.lemma(term)}  # "zidli" -> "židli" -> "židle"
+        if secret in forms:
             return GuessResult(word, None if word == secret else secret, 1.0, solved=True)
 
-        term = self._model.resolve(word)
         if term is None:
             return GuessResult(word, None, None, solved=False)
         return GuessResult(
