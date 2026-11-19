@@ -11,7 +11,7 @@ import simplemma
 from gensim.models import KeyedVectors
 
 from app.text import is_word
-from app.vectorfiles import aliases_file, norms_file
+from app.vectorfiles import aliases_file, norms_file, references_file
 
 log = logging.getLogger(__name__)
 
@@ -47,8 +47,10 @@ class SemanticModel:
         vectors: KeyedVectors,
         aliases: Mapping[str, str] | None = None,
         norms: np.ndarray | None = None,
+        references: Mapping[str, Mapping[int, float]] | None = None,
     ) -> None:
         self._vectors = vectors
+        self._precomputed = dict(references or {})
         # Spellings without diacritics ("zidle") -> the dictionary word ("židle").
         self._aliases = dict(aliases or {})
         vectors.norms = compute_norms(vectors.vectors) if norms is None else norms
@@ -62,8 +64,17 @@ class SemanticModel:
             json.loads(aliases_path.read_text(encoding="utf-8")) if aliases_path.exists() else {}
         )
         norms = np.load(norms_path) if norms_path.exists() else None
+        references_path = references_file(path)
+        references = (
+            {
+                word: {int(rank): score for rank, score in ranks.items()}
+                for word, ranks in json.loads(references_path.read_text(encoding="utf-8")).items()
+            }
+            if references_path.exists()
+            else {}
+        )
         # mmap keeps the matrix in the page cache, shared between workers.
-        model = cls(KeyedVectors.load(str(path), mmap="r"), aliases, norms)
+        model = cls(KeyedVectors.load(str(path), mmap="r"), aliases, norms, references)
         log.info("Loaded %d word vectors and %d spelling aliases", len(model), len(aliases))
         return model
 
@@ -119,6 +130,11 @@ class SemanticModel:
         )
 
     def _reference(self, secret: str) -> dict[int, float]:
+        if secret in self._precomputed:
+            return dict(self._precomputed[secret])
+        return self.compute_reference(secret)
+
+    def compute_reference(self, secret: str) -> dict[int, float]:
         """Similarity of the n-th closest *different* word, for each reference rank.
 
         Inflections ("jizvy", "jizvou" for "jizva") are skipped: they are always

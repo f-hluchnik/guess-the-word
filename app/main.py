@@ -36,15 +36,15 @@ def load_game(settings: Settings) -> Game:
         WordList.load(settings.words_path),
         key=settings.puzzle_secret.get_secret_value().encode(),
     )
-    game = Game(model, calendar)
-    game.warm_up()
-    return game
+    return Game(model, calendar)
 
 
 def _load_in_background(app: FastAPI, settings: Settings) -> None:
     try:
-        app.state.game = load_game(settings)
+        game = load_game(settings)
+        app.state.game = game
         log.info("Ready")
+        game.warm_up()  # instant with precomputed references; a full pass without
     except Exception:
         # A broken word list or vector file: crash so it shows up in fly logs
         # and the machine restarts, instead of answering 503 forever.
@@ -65,6 +65,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ).start()
         else:
             app.state.game = load_game(settings)
+            app.state.game.warm_up()
         yield
 
     app = FastAPI(
