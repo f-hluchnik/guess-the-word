@@ -27,5 +27,10 @@ class Settings(BaseSettings):
     # or replicas so they share one budget.
     rate_limit_storage_uri: str = "memory://"
 
+    # Load the vectors after the server starts listening, so the page and
+    # /healthz answer at once on a cold start while /api returns 503 until
+    # ready. Tests turn it off to load synchronously and see errors directly.
+    load_in_background: bool = True
+
     docs_enabled: bool = False
     log_level: str = "INFO"

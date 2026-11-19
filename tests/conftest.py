@@ -10,7 +10,7 @@ from gensim.models import KeyedVectors
 
 from app.config import Settings
 from app.main import create_app
-from app.text import aliases_file
+from app.vectorfiles import aliases_file
 
 DIM = 32
 
@@ -62,6 +62,7 @@ def settings(vectors_path: Path, tmp_path: Path) -> Settings:
         vectors_path=vectors_path,
         words_path=write_words(tmp_path / "words.toml", ["jizva"]),
         guess_rate_limit="1000/minute",
+        load_in_background=False,
     )
 
 

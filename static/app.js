@@ -1,9 +1,10 @@
 const API = "/api";
 const TIMEOUT_MS = 8000;
-// The first load may wake a suspended or stopped machine, so it gets longer
-// and a few retries before the page gives up.
+// The first load may wake a stopped machine, which takes a while to load its
+// vectors and answers 503 meanwhile, so keep retrying for up to a minute.
 const START_TIMEOUT_MS = 20000;
-const START_RETRY_DELAYS_MS = [1000, 3000];
+const START_DEADLINE_MS = 60000;
+const START_RETRY_MS = 2000;
 const STORAGE_PREFIX = "guesses:";
 const APP_NAME = document.querySelector('meta[name="application-name"]').content;
 
@@ -43,7 +44,7 @@ const el = {
 };
 
 const state = {
-  puzzle: null, // { number, date, vocabulary_size, neighbours: [{ rank, similarity }] }
+  puzzle: null, // { id, number, date, preview, vocabulary_size, neighbours: [{ rank, similarity }] }
   guesses: [], // { n, word, lemma, similarity, solved }
   busy: false,
 };
@@ -75,22 +76,24 @@ async function api(path, { body, timeout = TIMEOUT_MS } = {}) {
 
 /* ---------- Persistence: progress survives a reload, one puzzle at a time ---------- */
 
-const storageKey = (number) => STORAGE_PREFIX + number;
+// Keyed by the puzzle's id, not its number: if the schedule is ever reset,
+// puzzle 1 may be a different word, and old guesses must not carry over.
+const storageKey = (id) => STORAGE_PREFIX + id;
 
-function loadGuesses(number) {
+function loadGuesses(id) {
   try {
-    const saved = JSON.parse(localStorage.getItem(storageKey(number)));
+    const saved = JSON.parse(localStorage.getItem(storageKey(id)));
     return Array.isArray(saved) ? saved : [];
   } catch {
     return [];
   }
 }
 
-function saveGuesses(number, guesses) {
+function saveGuesses(id, guesses) {
   try {
-    localStorage.setItem(storageKey(number), JSON.stringify(guesses));
+    localStorage.setItem(storageKey(id), JSON.stringify(guesses));
     for (const key of Object.keys(localStorage)) {
-      if (key.startsWith(STORAGE_PREFIX) && key !== storageKey(number)) {
+      if (key.startsWith(STORAGE_PREFIX) && key !== storageKey(id)) {
         localStorage.removeItem(key);
       }
     }
@@ -137,7 +140,7 @@ async function submitGuess(raw) {
       solved: result.solved,
     };
     state.guesses.push(guess);
-    saveGuesses(state.puzzle.number, state.guesses);
+    saveGuesses(state.puzzle.id, state.guesses);
     el.input.value = "";
     render(guess);
   } catch (error) {
@@ -157,6 +160,8 @@ function errorMessage(error) {
       return "Napiš jedno slovo jen z písmen, bez mezer a číslic.";
     case 429:
       return "Moc pokusů za minutu. Chvíli počkej a zkus to znovu.";
+    case 503:
+      return "Server se ještě probouzí. Zkus to za pár vteřin.";
     default:
       return "Na serveru se něco pokazilo. Zkus to za chvíli znovu.";
   }
@@ -183,12 +188,13 @@ function setBusy(busy) {
 }
 
 function renderHeader() {
-  const { number, date, vocabulary_size, neighbours } = state.puzzle;
+  const { number, date, preview, vocabulary_size, neighbours } = state.puzzle;
   const [y, m, d] = date.split("-").map(Number);
+  const day = longDate.format(new Date(y, m - 1, d));
 
   document.title = `${APP_NAME} #${number}`;
   el.title.textContent = `${APP_NAME} #${number}`;
-  el.date.textContent = longDate.format(new Date(y, m - 1, d));
+  el.date.textContent = preview ? `Zkušební provoz. Hra začne ${day}.` : day;
   el.vocabulary.textContent = integer.format(vocabulary_size);
 
   if (neighbours.length) {
@@ -255,12 +261,15 @@ function render(latest = null) {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function loadPuzzle() {
-  for (const delay of [...START_RETRY_DELAYS_MS, null]) {
+  const deadline = Date.now() + START_DEADLINE_MS;
+  for (let attempt = 0; ; attempt++) {
     try {
       return await api("/puzzles/today", { timeout: START_TIMEOUT_MS });
     } catch (error) {
-      if (delay === null || (error.status >= 400 && error.status < 500)) throw error;
-      await sleep(delay);
+      const clientError = error.status >= 400 && error.status < 500;
+      if (clientError || Date.now() > deadline) throw error;
+      if (attempt === 0) say("Server se probouzí, chvilku strpení…");
+      await sleep(START_RETRY_MS);
     }
   }
 }
@@ -273,7 +282,7 @@ async function start() {
     say("Dnešní slovo se nepodařilo načíst. Zkontroluj připojení a obnov stránku.");
     return;
   }
-  state.guesses = loadGuesses(state.puzzle.number);
+  state.guesses = loadGuesses(state.puzzle.id);
   renderHeader();
   render();
 }

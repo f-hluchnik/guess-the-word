@@ -10,16 +10,15 @@ import numpy as np
 import simplemma
 from gensim.models import KeyedVectors
 
-from app.text import aliases_file, is_word
+from app.text import is_word
+from app.vectorfiles import aliases_file, norms_file
 
 log = logging.getLogger(__name__)
 
 # Players see how similar the 1st, 10th and 1000th closest words are to the
 # secret, as a scale for their own guesses. The words themselves stay hidden.
 REFERENCE_RANKS = (1, 10, 1000)
-# Rows per chunk when computing vector norms. gensim's fill_norms() squares the
-# whole matrix at once, a temporary as large as the vectors themselves (~420 MB),
-# which alone would overflow a 512 MB machine at startup.
+# Rows per chunk when computing vector norms; see compute_norms().
 _NORM_CHUNK = 20_000
 # Extra neighbours to fetch, since inflections of the secret are skipped.
 _INFLECTION_SLACK = 300
@@ -31,30 +30,40 @@ _NOUN_ENDINGS = frozenset(
 )
 
 
+def compute_norms(matrix: np.ndarray) -> np.ndarray:
+    """Row lengths, in chunks: gensim's fill_norms() squares the whole matrix
+    at once, a temporary as large as the vectors (~420 MB)."""
+    return np.concatenate(
+        [
+            np.linalg.norm(matrix[i : i + _NORM_CHUNK], axis=1)
+            for i in range(0, len(matrix), _NORM_CHUNK)
+        ]
+    )
+
+
 class SemanticModel:
-    def __init__(self, vectors: KeyedVectors, aliases: Mapping[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        vectors: KeyedVectors,
+        aliases: Mapping[str, str] | None = None,
+        norms: np.ndarray | None = None,
+    ) -> None:
         self._vectors = vectors
         # Spellings without diacritics ("zidle") -> the dictionary word ("židle").
         self._aliases = dict(aliases or {})
-        # Precompute norms now so the first request doesn't pay for it.
-        matrix = vectors.vectors
-        vectors.norms = np.concatenate(
-            [
-                np.linalg.norm(matrix[i : i + _NORM_CHUNK], axis=1)
-                for i in range(0, len(matrix), _NORM_CHUNK)
-            ]
-        )
+        vectors.norms = compute_norms(vectors.vectors) if norms is None else norms
         self.reference = lru_cache(maxsize=32)(self._reference)
 
     @classmethod
     def load(cls, path: Path) -> "SemanticModel":
         log.info("Loading word vectors from %s", path)
-        aliases_path = aliases_file(path)
+        aliases_path, norms_path = aliases_file(path), norms_file(path)
         aliases = (
             json.loads(aliases_path.read_text(encoding="utf-8")) if aliases_path.exists() else {}
         )
+        norms = np.load(norms_path) if norms_path.exists() else None
         # mmap keeps the matrix in the page cache, shared between workers.
-        model = cls(KeyedVectors.load(str(path), mmap="r"), aliases)
+        model = cls(KeyedVectors.load(str(path), mmap="r"), aliases, norms)
         log.info("Loaded %d word vectors and %d spelling aliases", len(model), len(aliases))
         return model
 

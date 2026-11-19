@@ -1,9 +1,12 @@
 """Game rules, independent of HTTP."""
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from app.puzzle import Puzzle, PuzzleCalendar
-from app.vocabulary import SemanticModel
+
+if TYPE_CHECKING:  # importing gensim takes seconds; keep it off the startup path
+    from app.vocabulary import SemanticModel
 
 
 class PuzzleNotAvailable(LookupError):
@@ -24,7 +27,7 @@ class GuessResult:
 
 
 class Game:
-    def __init__(self, model: SemanticModel, calendar: PuzzleCalendar) -> None:
+    def __init__(self, model: "SemanticModel", calendar: PuzzleCalendar) -> None:
         missing = [w for w in calendar.words if w not in model]
         if missing:
             raise ValueError(f"Secret words missing from the vectors: {', '.join(missing)}")
@@ -47,6 +50,24 @@ class Game:
     def reference(self, puzzle: Puzzle) -> dict[int, float]:
         """Similarity of the 1st, 10th and 1000th closest words to the secret."""
         return self._model.reference(puzzle.secret)
+
+    def warm_up(self) -> None:
+        """Compute today's and tomorrow's reference values ahead of time.
+
+        Each is a full pass over the vectors, several seconds on a small
+        machine, which would otherwise land on a player's request.
+        """
+        today = self._calendar.current_number()
+        for number in (today, today + 1):
+            self._model.reference(self._calendar.get(number).secret)
+
+    def public_id(self, puzzle: Puzzle) -> str:
+        """Opaque id that changes whenever the puzzle's word could change."""
+        return self._calendar.public_id(puzzle.number)
+
+    def is_preview(self) -> bool:
+        """True before the launch day: puzzle 1 is shown early."""
+        return self._calendar.is_preview()
 
     def guess(self, puzzle: Puzzle, word: str) -> GuessResult:
         """Score an already normalised and validated word."""

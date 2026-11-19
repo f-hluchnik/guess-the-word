@@ -116,6 +116,15 @@ class PuzzleCalendar:
         # Before the epoch, puzzle no. 1 is shown, which is handy for testing a launch.
         return max(1, self._words.number_on(self._words.today(now)))
 
+    def is_preview(self, now: datetime | None = None) -> bool:
+        return self._words.number_on(self._words.today(now)) < 1
+
+    def public_id(self, number: int) -> str:
+        """Identifies puzzle `number` under this key and schedule, for clients to
+        key saved progress by. Reveals nothing about the word."""
+        message = f"{number}:{self._words.epoch}:{self._secret(number - 1)}".encode()
+        return hmac.digest(self._key, b"id:" + message, hashlib.sha256).hex()[:16]
+
     def get(self, number: int) -> Puzzle:
         if number < 1:
             raise ValueError(f"Puzzle numbers start at 1, got {number}.")

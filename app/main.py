@@ -1,4 +1,6 @@
 import logging
+import os
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -11,7 +13,8 @@ from app.config import Settings
 from app.game import Game
 from app.puzzle import PuzzleCalendar, WordList
 from app.ratelimit import RateLimit
-from app.vocabulary import SemanticModel
+
+log = logging.getLogger(__name__)
 
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
@@ -25,21 +28,43 @@ SECURITY_HEADERS = {
 }
 
 
+def load_game(settings: Settings) -> Game:
+    from app.vocabulary import SemanticModel  # imports gensim, which takes seconds
+
+    model = SemanticModel.load(settings.vectors_path)
+    calendar = PuzzleCalendar(
+        WordList.load(settings.words_path),
+        key=settings.puzzle_secret.get_secret_value().encode(),
+    )
+    game = Game(model, calendar)
+    game.warm_up()
+    return game
+
+
+def _load_in_background(app: FastAPI, settings: Settings) -> None:
+    try:
+        app.state.game = load_game(settings)
+        log.info("Ready")
+    except Exception:
+        # A broken word list or vector file: crash so it shows up in fly logs
+        # and the machine restarts, instead of answering 503 forever.
+        log.exception("Loading the game failed")
+        os._exit(1)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     logging.basicConfig(level=settings.log_level, format="%(levelname)s %(name)s: %(message)s")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        model = SemanticModel.load(settings.vectors_path)
-        calendar = PuzzleCalendar(
-            WordList.load(settings.words_path),
-            key=settings.puzzle_secret.get_secret_value().encode(),
-        )
-        game = Game(model, calendar)
-        # Warm up while the machine boots, not on the first player's request.
-        game.reference(game.today())
-        app.state.game = game
+        app.state.game = None
+        if settings.load_in_background:
+            threading.Thread(
+                target=_load_in_background, args=(app, settings), name="load-game", daemon=True
+            ).start()
+        else:
+            app.state.game = load_game(settings)
         yield
 
     app = FastAPI(
@@ -72,8 +97,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     @app.get("/healthz", include_in_schema=False)
-    def healthz() -> dict[str, str]:
-        return {"status": "ok"}
+    def healthz(request: Request) -> dict[str, str | bool]:
+        # Liveness only: the process is up. "ready" says whether /api works yet.
+        return {"status": "ok", "ready": request.app.state.game is not None}
 
     app.include_router(router)
     app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="static")

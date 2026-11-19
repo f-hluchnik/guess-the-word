@@ -20,7 +20,9 @@ diacritics and sit among other such words, only about 50 % similar to the
 word they stand for. They are written to an alias file instead, so a player
 typing "zidle" is measured as "židle".
 
-Writes <output>, <output>.vectors.npy and <output>.aliases.json.
+Writes <output>, <output>.vectors.npy, <output>.aliases.json and
+<output>.norms.npy (vector lengths, so the server needn't read every vector
+at startup).
 """
 
 import argparse
@@ -34,7 +36,8 @@ import numpy as np
 import simplemma
 from gensim.models import KeyedVectors
 
-from app.text import aliases_file, is_word, normalize, strip_diacritics
+from app.text import is_word, normalize, strip_diacritics
+from app.vectorfiles import aliases_file, norms_file
 
 SOURCE_URL = "https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.cs.300.vec.gz"
 
@@ -101,6 +104,7 @@ def main() -> None:
     aliases_file(args.output).write_text(
         json.dumps(aliases, ensure_ascii=False, sort_keys=True), encoding="utf-8"
     )
+    np.save(norms_file(args.output), np.linalg.norm(vectors.vectors, axis=1).astype(np.float32))
     log.info("Saved %d words and %d aliases next to %s", len(vectors), len(aliases), args.output)
     if args.delete_source:
         args.source.unlink()
