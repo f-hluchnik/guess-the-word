@@ -4,6 +4,7 @@ import logging
 from functools import lru_cache
 from pathlib import Path
 
+import numpy as np
 import simplemma
 from gensim.models import KeyedVectors
 
@@ -14,6 +15,10 @@ log = logging.getLogger(__name__)
 # Players see how similar the 1st, 10th and 1000th closest words are to the
 # secret, as a scale for their own guesses. The words themselves stay hidden.
 REFERENCE_RANKS = (1, 10, 1000)
+# Rows per chunk when computing vector norms. gensim's fill_norms() squares the
+# whole matrix at once, a temporary as large as the vectors themselves (~420 MB),
+# which alone would overflow a 512 MB machine at startup.
+_NORM_CHUNK = 20_000
 # Extra neighbours to fetch, since inflections of the secret are skipped.
 _INFLECTION_SLACK = 300
 # Czech noun case endings. simplemma doesn't know every inflected form (it has
@@ -27,8 +32,14 @@ _NOUN_ENDINGS = frozenset(
 class SemanticModel:
     def __init__(self, vectors: KeyedVectors) -> None:
         self._vectors = vectors
-        # Precompute unit norms now so the first request doesn't pay for it.
-        vectors.fill_norms()
+        # Precompute norms now so the first request doesn't pay for it.
+        matrix = vectors.vectors
+        vectors.norms = np.concatenate(
+            [
+                np.linalg.norm(matrix[i : i + _NORM_CHUNK], axis=1)
+                for i in range(0, len(matrix), _NORM_CHUNK)
+            ]
+        )
         self.reference = lru_cache(maxsize=32)(self._reference)
 
     @classmethod

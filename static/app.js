@@ -1,5 +1,9 @@
 const API = "/api";
 const TIMEOUT_MS = 8000;
+// The first load may wake a suspended or stopped machine, so it gets longer
+// and a few retries before the page gives up.
+const START_TIMEOUT_MS = 20000;
+const START_RETRY_DELAYS_MS = [1000, 3000];
 const STORAGE_PREFIX = "guesses:";
 const APP_NAME = document.querySelector('meta[name="application-name"]').content;
 
@@ -53,14 +57,14 @@ class ApiError extends Error {
   }
 }
 
-async function api(path, { body } = {}) {
+async function api(path, { body, timeout = TIMEOUT_MS } = {}) {
   let response;
   try {
     response = await fetch(API + path, {
       method: body ? "POST" : "GET",
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body && JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeout),
     });
   } catch {
     throw new ApiError(0);
@@ -248,10 +252,24 @@ function render(latest = null) {
 
 /* ---------- Start ---------- */
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function loadPuzzle() {
+  for (const delay of [...START_RETRY_DELAYS_MS, null]) {
+    try {
+      return await api("/puzzles/today", { timeout: START_TIMEOUT_MS });
+    } catch (error) {
+      if (delay === null || (error.status >= 400 && error.status < 500)) throw error;
+      await sleep(delay);
+    }
+  }
+}
+
 async function start() {
   try {
-    state.puzzle = await api("/puzzles/today");
-  } catch {
+    state.puzzle = await loadPuzzle();
+  } catch (error) {
+    console.error("Loading today's puzzle failed:", error);
     say("Dnešní slovo se nepodařilo načíst. Zkontroluj připojení a obnov stránku.");
     return;
   }

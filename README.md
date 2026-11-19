@@ -113,13 +113,15 @@ words = [
    words* (the puzzle will feel hopeless) or *lemmatiser reads it as …*
    (ambiguous forms, e.g. `rána` → `ráno`).
 3. Open a pull request. CI checks the format, duplicates, and that no batch
-   that has already started was changed.
+   that has already started was changed. To rewrite started batches on
+   purpose (only before launch), add the `schedule-reset` label to the pull
+   request.
 4. Merge. The deploy re-checks every word against the vectors while building
    the image and fails before anything goes live if one is missing.
 
 `python -m scripts.words status` shows how many days are left. A scheduled
 workflow runs it every Monday and fails (GitHub emails you) when fewer than
-30 days remain. If the list runs out, it is replayed in a new shuffled
+14 days remain: that email is the cue to add the next batch. If the list runs out, it is replayed in a new shuffled
 order, so the game never breaks. Add a batch before that happens.
 
 ### Rules
@@ -140,11 +142,18 @@ spoilers, so use it sparingly.
 
 ## Deploying to Fly.io
 
-Region `ams`, one `shared-cpu-1x` machine with 1 GB RAM always on and a second
-one that Fly starts under load. The vectors are built into the image and
-memory-mapped, so machines start in seconds and need no volume. Fly's builder
-caches the vectors layer; it only rebuilds when `scripts/build_vectors.py`,
-`requirements.txt` or `FREQUENT_WORDS` changes.
+Region `ams`, one `shared-cpu-1x` machine with 512 MB RAM that Fly suspends
+when nobody is playing and resumes on the next request in a few hundred
+milliseconds. While suspended, only its root filesystem is billed, so a quiet
+game costs well under a dollar a month. The process needs about 180 MB; the
+rest is page cache for the memory-mapped vectors.
+
+The vectors are built into the image, so machines need no volume. Fly's
+builder caches the vectors layer; it only rebuilds when
+`scripts/build_vectors.py`, `requirements.txt` or `FREQUENT_WORDS` changes.
+
+The machine count isn't part of `fly.toml`. Keep it at one with
+`fly scale count 1`; Fly creates two on the first deploy.
 
 ### First deploy
 
@@ -158,6 +167,7 @@ python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
 fly secrets set --stage PUZZLE_SECRET=<the value>
 
 fly deploy                       # first build downloads the vectors: about 10 minutes
+fly scale count 1                # Fly starts with two machines; one is enough
 fly open                         # opens https://kosinus.fly.dev
 ```
 
@@ -185,11 +195,19 @@ passes CI is deployed. The token expires after a year.
 | Logs | `fly logs` |
 | Status and health checks | `fly status`, `fly checks list` |
 | Roll back | `fly releases --image`, then `fly deploy --image <previous image>` |
-| More capacity | `fly scale count 2` or `fly scale memory 2048` |
+| More capacity | `fly scale memory 1024`, then `fly scale count 2` |
+| IP addresses | `fly ips list`: keep the shared IPv4 (free); a dedicated IPv4 costs extra |
 
 The rate limiter is in memory, so each machine has its own budget. That is
 fine for one or two machines. For more, point `RATE_LIMIT_STORAGE_URI` at
 Redis (for example Upstash through `fly redis create`).
+
+### Dependency updates
+
+Dependabot (`.github/dependabot.yml`) opens a pull request each month when a
+Python package, a GitHub Action or the Docker base image has a new version.
+CI runs on each one; merge it if it passes. New Python versions (3.13 and up)
+are ignored on purpose until gensim, numpy and scipy publish packages for them.
 
 ## Configuration
 

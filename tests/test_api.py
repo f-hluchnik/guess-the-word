@@ -170,3 +170,19 @@ def test_inflections_are_recognised(word: str, secret: str, expected: bool) -> N
     from app.vocabulary import SemanticModel
 
     assert SemanticModel.is_form_of(SemanticModel.__new__(SemanticModel), word, secret) is expected
+
+
+def test_chunked_norms_match_gensim(vectors_path) -> None:
+    import numpy as np
+    from gensim.models import KeyedVectors
+
+    from app import vocabulary
+
+    expected = KeyedVectors.load(str(vectors_path))
+    expected.fill_norms()
+    original, vocabulary._NORM_CHUNK = vocabulary._NORM_CHUNK, 3  # force several chunks
+    try:
+        model = vocabulary.SemanticModel.load(vectors_path)
+    finally:
+        vocabulary._NORM_CHUNK = original
+    np.testing.assert_allclose(model._vectors.norms, expected.norms, rtol=1e-6)

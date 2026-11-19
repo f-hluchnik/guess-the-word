@@ -17,10 +17,13 @@ kill_timeout = "10s"
 [http_service]
   internal_port = 8000
   force_https = true
-  # Keep one machine always warm; a second one starts only under load.
-  auto_stop_machines = "stop"
+  # Run one machine and suspend it when nobody plays. A suspended machine
+  # resumes from a memory snapshot in a few hundred ms, vectors already loaded,
+  # and costs only its root filesystem storage while idle.
+  # One machine is not set here: run `fly scale count 1` once.
+  auto_stop_machines = "suspend"
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 0
 
   [http_service.concurrency]
     type = "requests"
@@ -28,7 +31,8 @@ kill_timeout = "10s"
     hard_limit = 250
 
   [[http_service.checks]]
-    grace_period = "20s"
+    # Startup loads ~420 MB of vectors on a throttled shared CPU.
+    grace_period = "60s"
     interval = "15s"
     timeout = "3s"
     method = "GET"
@@ -36,4 +40,5 @@ kill_timeout = "10s"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "1gb"
+  # About 180 MB for the process; the rest is page cache for the vectors.
+  memory = "512mb"

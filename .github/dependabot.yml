@@ -15,3 +15,8 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      # A new Python version needs wheels for gensim, numpy and scipy first,
+      # and CI doesn't build the image. Upgrade by hand when they're out.
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

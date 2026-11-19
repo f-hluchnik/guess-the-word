@@ -1,6 +1,6 @@
 name: Word list runway
 
-# Fails, and so emails the repository owner, when fewer than 30 days of
+# Fails, and so emails the repository owner, when fewer than 14 days of
 # puzzles are left. Needs no secrets: it never sees the order of the words.
 on:
   schedule:
@@ -18,4 +18,4 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: python -m scripts.words status --min-runway 30
+      - run: python -m scripts.words status --min-runway 14
