@@ -27,3 +27,16 @@ words = [
   "kovadlina", "náprstek", "jezevec", "kořen",
   "perla", "pavouk", "trychtýř", "kružítko",
 ]
+
+[[batch]]
+words = [
+  # easier
+  "zahrada", "mapa", "loď", "ostrov", "mléko",
+  "postel", "klavír", "hvězda", "letadlo", "batoh",
+  # medium
+  "rukavice", "lžíce", "cibule", "blesk", "kůň", "ryba",
+  "louka", "přilba", "kladivo", "pečeť", "ledovec", "motýl",
+  # harder
+  "mikroskop", "sova", "jahoda", "gramofon",
+  "žirafa", "kbelík", "hodinář", "konev",
+]

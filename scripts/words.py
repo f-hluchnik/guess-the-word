@@ -93,7 +93,10 @@ def status(args: argparse.Namespace) -> int:
     words = WordList.load(args.path)
     today = words.number_on(words.today())
     runway = words.scheduled - today
-    print(f"Today is puzzle {today}. The list covers puzzles 1-{words.scheduled}", end="")
+    if today < 1:
+        print(f"Not launched yet: puzzle 1 is on {words.epoch}, in {1 - today} days.")
+        print("Until then the site shows puzzle 1, the same word every day.")
+    print(f"Today is puzzle {max(today, 1)}. The list covers puzzles 1-{words.scheduled}", end="")
     print(f" (until {words.date_of(words.scheduled)}).")
     if runway < 0:
         print("The list has run out and is being replayed. Append a batch.")

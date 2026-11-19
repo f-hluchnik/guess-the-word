@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator
 from datetime import date, timedelta
 from pathlib import Path
@@ -9,6 +10,7 @@ from gensim.models import KeyedVectors
 
 from app.config import Settings
 from app.main import create_app
+from app.text import aliases_file
 
 DIM = 32
 
@@ -39,6 +41,7 @@ def _toy_vectors() -> KeyedVectors:
 def vectors_path(tmp_path_factory: pytest.TempPathFactory) -> Path:
     path = tmp_path_factory.mktemp("vectors") / "toy.kv"
     _toy_vectors().save(str(path))
+    aliases_file(path).write_text(json.dumps({"sram": "šrám"}), encoding="utf-8")
     return path
 
 

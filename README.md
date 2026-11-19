@@ -43,7 +43,7 @@ browser ──GET /api/puzzles/today──────────────�
 fastText's Czech file has 2,000,000 tokens; 710,085 of them are lowercase
 words in the Czech alphabet. The game keeps the **300,000 most frequent** of
 those plus every rarer one that is in **simplemma's Czech dictionary**:
-351,654 words, 422 MB. Measured on the full file:
+345,642 words, 415 MB, plus 19,211 spelling aliases. Measured on the full file:
 
 | Frequency band | Share of tokens that are dictionary words |
 | --- | --- |
@@ -59,6 +59,14 @@ those plus every rarer one that is in **simplemma's Czech dictionary**:
   are within the top 300k (the rarest, `škvor`, ranks 268,104).
 - Of word forms the dictionary knows, 93 % are within the top 300k directly or
   through their base form; the dictionary pass adds the remaining real words.
+- **Spellings without diacritics** are aliases, not words. fastText learns
+  `zidle` from text typed without diacritics, so its vector sits among other
+  such words (`stul`, `gauc`, `satni`) and is only 52.9 % similar to `židle`.
+  A token written in plain letters that isn't a dictionary word, when a more
+  frequent dictionary word is spelled the same apart from diacritics, is left
+  out of the vectors and stored in `<vectors>.aliases.json` instead. Typing
+  `zidle` is then measured as `židle`, and `chleb` no longer shows up as the
+  nearest word to `chléb`.
 
 Change `FREQUENT_WORDS` in `fly.toml` to tune it.
 
@@ -128,8 +136,15 @@ order, so the game never breaks. Add a batch before that happens.
 
 - **Only append.** Never edit or reorder a batch that has started: that
   rewrites past puzzles. Unstarted batches can be edited freely.
-- **Don't change `epoch`, `timezone` or `PUZZLE_SECRET` after launch.** Each
-  one reshuffles every puzzle, past ones included.
+- **Don't change `PUZZLE_SECRET`, `epoch` or `timezone` after launch.** A new
+  secret reshuffles every puzzle, past ones included. A new `epoch` or
+  `timezone` moves which puzzle falls on which day, so players' saved
+  progress and puzzle numbers stop matching. CI refuses both unless the pull
+  request has the `schedule-reset` label.
+- **A future `epoch`** (before launch) is fine: until that day the site shows
+  puzzle 1, the same word every day, and the header shows the launch date.
+  On launch day numbering starts for real. `python -m scripts.words status`
+  shows how many days are left until launch.
 - **Choosing words:** common, concrete nouns in the singular nominative. Avoid
   proper nouns, brands, slurs and topics that could hurt someone (illness,
   death). Mix easy and hard words, and avoid near-synonyms in one batch.
@@ -186,7 +201,17 @@ fly tokens create deploy -x 8760h
 
 Save the output as the repository secret `FLY_API_TOKEN` (GitHub → Settings →
 Secrets and variables → Actions). From then on, every push to `main` that
-passes CI is deployed. The token expires after a year.
+passes CI is deployed.
+
+> **The deploy token expires after a year.** The current one was created on
+> 19 November 2026, so renew it before **19 November 2027** (put it in your
+> calendar). Once it has expired, the `deploy` job fails with an
+> authentication error and nothing new goes live, while the site keeps running
+> the last deployed version. To renew, run the same
+> `fly tokens create deploy -x 8760h`, paste the output over the existing
+> `FLY_API_TOKEN` secret, and re-run the failed job. To check the token works
+> without waiting for a change, run the CI workflow on `main` by hand
+> (Actions → CI → Run workflow); it redeploys the current version.
 
 ### Day to day
 
