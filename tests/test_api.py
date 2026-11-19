@@ -132,7 +132,67 @@ def test_docs_are_off_by_default(client: TestClient) -> None:
 
 
 def test_health(client: TestClient) -> None:
-    assert client.get("/healthz").json() == {"status": "ok"}
+    assert client.get("/healthz").json() == {"status": "ok", "ready": True}
+
+
+def test_api_answers_503_until_the_vectors_are_loaded(settings: Settings, monkeypatch) -> None:
+    import threading
+    import time
+
+    from app import main
+
+    release = threading.Event()
+    real_load = main.load_game
+
+    def slow_load(settings):
+        release.wait(10)
+        return real_load(settings)
+
+    monkeypatch.setattr(main, "load_game", slow_load)
+    background = settings.model_copy(update={"load_in_background": True})
+    with TestClient(create_app(background)) as client:
+        assert client.get("/").status_code == 200  # the page is served at once
+        assert client.get("/healthz").json() == {"status": "ok", "ready": False}
+        waiting = client.get("/api/puzzles/today")
+        assert waiting.status_code == 503
+        assert waiting.headers["Retry-After"] == "2"
+
+        release.set()
+        deadline = time.monotonic() + 10
+        while client.get("/healthz").json()["ready"] is False and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert client.get("/api/puzzles/today").status_code == 200
+
+
+def test_puzzle_id_and_preview(client: TestClient, settings: Settings) -> None:
+    from datetime import date, timedelta
+
+    puzzle = today(client)
+    assert len(puzzle["id"]) == 16 and puzzle["preview"] is False
+    assert today(client)["id"] == puzzle["id"]  # stable
+
+    # Moving the epoch to the future: puzzle 1 shown early, under a new id.
+    write_words(settings.words_path, ["jizva"], epoch=date.today() + timedelta(days=5))
+    with TestClient(create_app(settings)) as moved:
+        early = today(moved)
+    assert early["number"] == 1 and early["preview"] is True
+    assert early["id"] != puzzle["id"]
+
+
+def test_precomputed_norms_are_used(vectors_path, tmp_path) -> None:
+    import shutil
+
+    import numpy as np
+
+    from app.vectorfiles import norms_file
+    from app.vocabulary import SemanticModel
+
+    copy = tmp_path / vectors_path.name
+    for f in vectors_path.parent.glob(vectors_path.name + "*"):
+        shutil.copy(f, tmp_path / f.name)
+    marker = np.full(8, 7.0, dtype=np.float32)
+    np.save(norms_file(copy), marker)
+    assert (SemanticModel.load(copy)._vectors.norms == marker).all()
 
 
 def test_rate_limit_uses_trusted_proxy_header(settings: Settings) -> None:

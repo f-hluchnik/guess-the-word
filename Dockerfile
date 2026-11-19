@@ -16,7 +16,7 @@ RUN pip install -r requirements.txt
 # FREQUENT_WORDS change, so normal deploys reuse it from the builder's cache.
 FROM base AS vectors
 ARG FREQUENT_WORDS=300000
-COPY app/__init__.py app/text.py ./app/
+COPY app/__init__.py app/text.py app/vectorfiles.py ./app/
 COPY scripts/__init__.py scripts/build_vectors.py ./scripts/
 RUN python -m scripts.build_vectors \
         --source /tmp/cc.cs.300.vec.gz --output /vectors/cc.cs.300.kv \

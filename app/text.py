@@ -1,7 +1,6 @@
 """Input normalisation shared by the API and the vector build script."""
 
 import unicodedata
-from pathlib import Path
 
 MAX_WORD_LENGTH = 40
 
@@ -26,8 +25,3 @@ def strip_diacritics(word: str) -> str:
     """ "židle" -> "zidle"."""
     decomposed = unicodedata.normalize("NFD", word)
     return "".join(c for c in decomposed if not unicodedata.combining(c))
-
-
-def aliases_file(vectors_path: Path) -> Path:
-    """Where the build script stores spelling aliases next to the vectors."""
-    return vectors_path.with_name(vectors_path.name + ".aliases.json")

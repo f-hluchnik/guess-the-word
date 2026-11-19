@@ -142,9 +142,23 @@ order, so the game never breaks. Add a batch before that happens.
   progress and puzzle numbers stop matching. CI refuses both unless the pull
   request has the `schedule-reset` label.
 - **A future `epoch`** (before launch) is fine: until that day the site shows
-  puzzle 1, the same word every day, and the header shows the launch date.
+  puzzle 1, the same word every day, labelled "Zkušební provoz. Hra začne …".
   On launch day numbering starts for real. `python -m scripts.words status`
   shows how many days are left until launch.
+
+### Test run first, real launch later
+
+The word order depends only on `PUZZLE_SECRET` and the batches, not on
+`epoch`. So you can let people try the game now and start over later:
+
+1. Open a pull request that sets `epoch` to the launch date, add the
+   `schedule-reset` label, and merge it. Puzzle numbering restarts at 1 on
+   that date, with the same words in the same order.
+2. Testers have already seen the first few answers. To give the launch a
+   fresh order, also set a new secret, and save it in your password manager:
+   `fly secrets set PUZZLE_SECRET=<new value>` (this restarts the machine).
+3. Players' saved progress is keyed by an id that changes with the epoch and
+   the secret, so no test guesses carry over into the real puzzle 1.
 - **Choosing words:** common, concrete nouns in the singular nominative. Avoid
   proper nouns, brands, slurs and topics that could hurt someone (illness,
   death). Mix easy and hard words, and avoid near-synonyms in one batch.
@@ -165,7 +179,16 @@ rest is page cache for the memory-mapped vectors.
 
 The vectors are built into the image, so machines need no volume. Fly's
 builder caches the vectors layer; it only rebuilds when
-`scripts/build_vectors.py`, `requirements.txt` or `FREQUENT_WORDS` changes.
+`scripts/build_vectors.py`, `app/text.py`, `app/vectorfiles.py`,
+`requirements.txt` or `FREQUENT_WORDS` changes.
+
+**Cold starts.** After a deploy, or when Fly stops rather than suspends the
+machine, the next visitor triggers a full boot. The server answers within a
+second and serves the page, then loads the vectors in the background (about
+20–30 seconds on this machine size). Until then `/api` answers 503 and the
+page shows "Server se probouzí…" and retries. `/healthz` is always 200 while
+the process runs; its `ready` field says whether the vectors are loaded.
+Resuming from suspend skips all of this.
 
 The machine count isn't part of `fly.toml`. Keep it at one with
 `fly scale count 1`; Fly creates two on the first deploy.
