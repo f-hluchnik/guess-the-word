@@ -17,13 +17,13 @@ timezone = "Europe/Prague"
 
 [[batch]]
 words = [
-  "jizva",
-  "hrad",
-  "auto",
-  "kniha",
-  "slunce",
-  "počítač",
-  "moře",
-  "chléb",
-  "kytara",
+  # easier
+  "pes", "strom", "okno", "klíč", "vlak",
+  "deštník", "polštář", "zrcadlo", "včela", "čaj",
+  # medium
+  "maják", "kompas", "sopka", "žebřík", "houba", "sněhulák",
+  "svíčka", "dalekohled", "mlýn", "harfa", "tulipán", "sklep",
+  # harder
+  "kovadlina", "náprstek", "jezevec", "kořen",
+  "perla", "pavouk", "trychtýř", "kružítko",
 ]
